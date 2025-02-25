@@ -107,6 +107,18 @@ pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {//5
     // let _x = x.data();
 
     todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+
+    // x.data()就是获取Tensor里的数据，如果Tensor是[1,2,3,4,5,6]，那么let a = x.data()
+    // a的内容就是[1,2,3,4,5,6]
+    let length=y.size();
+    let len=y.size();
+    assert!(len==x.size());
+    // assert!(x.size()==y.size());
+    let y_data=y.data_mut();
+    let x_data=x.data();
+    for i in 0..length{
+        y_data[i]=y_data[i]*x_data[i]/(1.0+(-x_data[i]).exp());
+    }
 }
 
 // C = beta * C + alpha * A @ B^T
