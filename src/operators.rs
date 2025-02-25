@@ -2,10 +2,10 @@ use crate::tensor::Tensor;
 
 // get (row) vectors from a 2D table given a list of indices
 pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
-    let length = indices.size();
-    let table_shape = table.shape();
+    let length = indices.size();//我要提取几行，也就是提取几个向量（二维）
+    let table_shape = table.shape();//这里的shape是自定义（非rust），就是结构体中的一个值。这里二维应该返回的是[8,9]这样的
     assert!(table_shape.len() == 2);
-    let dim = table_shape[1];
+    let dim = table_shape[1];//获取每行向量有几个分量，二维的话就是列数
     assert!(y.size() == length * dim);
     for i in 0..length {
         let src = &table.data()[indices.data()[i] as usize * dim..][..dim];
@@ -15,7 +15,7 @@ pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
 }
 
 // RoPE: Rotary Positional Embedding
-pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
+pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {//2
     let shape = y.shape();
     assert!(shape.len() == 3);
     let seq_len = shape[0];
@@ -39,7 +39,7 @@ pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
 
 // softmax(x) = exp(x - max) / sum(exp(x - max))
 // y = softmax(mask(x))
-pub fn masked_softmax(y: &mut Tensor<f32>) {
+pub fn masked_softmax(y: &mut Tensor<f32>) {//3
     let ndim = y.shape().len();
     assert!(ndim >= 2);
     let seq_len = y.shape()[ndim - 2];
@@ -70,13 +70,36 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
     }
 }
 
-pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {//传参三个张量：输入、输出、权重张量 epsilon：一个很小的值，用于避免除零错误，常见的做法是在计算 RMS 时加上一个微小的常数来稳定计算。
+    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")//均方根计算逻辑：对当前行的元素平方求和、除以元素个数，再加上 epsilon 后取平方根
+    //我的输入：x 输出：y
+    //w 必须与 x 的列数匹配。x.shape()[1]这里应该是有两个元素的元组，1是他的第二个元素，eg。2*3 返回3
+// todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    assert!(y.size() == x.size(), "y 和 x 的总元素数量必须相同");
+    assert!(y.shape() == x.shape(), "y 和 x 的形状必须完全一致");
+    assert!(w.size() == x.shape()[1], "w 的长度必须等于 x 的第二维度大小");
+
+    let y_size = y.size();
+    let y_data = unsafe { y.data_mut() };
+    
+    for i in 0..y_size {
+        let block_start = (i / w.size()) * w.size();
+        let block_end = block_start + w.size();
+
+        let mut rms = 0.0;
+        for j in block_start..block_end {
+            rms += x.data()[j].powi(2); // 累加平方
+        }
+        rms = (rms / w.size() as f32 + epsilon).sqrt(); // 计算均方根
+
+        // 归一化当前元素
+        y_data[i] = w.data()[i % w.size()] * x.data()[i] / rms;
+    }
 }
 
 // y = silu(x) * y
 // hint: this is an element-wise operation
-pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
+pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {//5
     // let len = y.size();
     // assert!(len == x.size());
 
@@ -88,13 +111,13 @@ pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
-pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
+pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {//6
     todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
 }
 
 // Dot product of two tensors (treated as vectors)
 #[allow(unused)]
-pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {
+pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {//7
     let len = x.size();
     assert!(len == y.size());
     let x_ = x.data();
@@ -107,7 +130,7 @@ pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {
 }
 
 // Sample a index from a tensor (treated as a probability vector)
-pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
+pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) -> u32 {//8
     assert!(x.shape()[x.shape().len() - 1] == x.size());
     if temperature <= 0. || top_k < 2 || top_p <= 0. {
         return x
@@ -173,7 +196,7 @@ pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) 
 
 // Your implementation should at least pass the following tests:
 #[test]
-fn test_silu() {
+fn test_silu() {//
     let mut y = Tensor::<f32>::new(vec![2., 3., 4.], &vec![1, 3]);
     let x = Tensor::<f32>::new(vec![1., 2., 3.], &vec![1, 3]);
     swiglu(&mut y, &x);
@@ -184,7 +207,7 @@ fn test_silu() {
 }
 
 #[test]
-fn test_rms_norm() {
+fn test_rms_norm() {//10
     let mut y = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
     let x = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
     let w = Tensor::<f32>::new(vec![1., 2.], &vec![2]);
@@ -199,7 +222,7 @@ fn test_rms_norm() {
 }
 
 #[test]
-fn test_matmul_transb() {
+fn test_matmul_transb() {//11
     let mut c = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
     let a = Tensor::<f32>::new(vec![1., 2., 3., 4., 5., 6.], &vec![2, 3]);
     let b = Tensor::<f32>::new(vec![1., 2., 3., 4., 5., 6.], &vec![2, 3]);

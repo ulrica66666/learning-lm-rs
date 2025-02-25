@@ -25,6 +25,7 @@ impl<T: Copy + Clone + Default> Tensor<T> {
 
     pub fn data(&self) -> &[T] {
         &self.data[self.offset..][..self.length]
+        // 等价于self.data[self.offset:self.offset + self.length]
     }
 
     pub unsafe fn data_mut(&mut self) -> &mut [T] {
