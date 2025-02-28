@@ -71,30 +71,28 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {//3
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {//传参三个张量：输入、输出、权重张量 epsilon：一个很小的值，用于避免除零错误，常见的做法是在计算 RMS 时加上一个微小的常数来稳定计算。
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")//均方根计算逻辑：对当前行的元素平方求和、除以元素个数，再加上 epsilon 后取平方根
-    //我的输入：x 输出：y
-    //w 必须与 x 的列数匹配。x.shape()[1]这里应该是有两个元素的元组，1是他的第二个元素，eg。2*3 返回3
-// todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
-    assert!(y.size() == x.size(), "y 和 x 的总元素数量必须相同");
-    assert!(y.shape() == x.shape(), "y 和 x 的形状必须完全一致");
-    assert!(w.size() == x.shape()[1], "w 的长度必须等于 x 的第二维度大小");
+    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试");//均方根计算逻辑：对当前行的元素平方求和、除以元素个数，再加上 epsilon 后取平方根
+    assert(w.size()==x.shape().last().copied().unwrap_or(0),"w向量的分量个数和x向量的分量个数不一样");//因为w是一维的，所以size返回的才是向量的分量个数
+    assert(w.shape().len()==1,"w不是一维向量");
+    assert(x.shape().last().copied().unwrap_or(0)==y.shape().last().copied().unwrap_or(0),"x，y向量分量长度一样");
 
-    let y_size = y.size();
-    let y_data = unsafe { y.data_mut() };
+    let x_data=x.data();
+    let w_data=w.data();//获取到底层一维长数据
+
+    let vec_num=x.shape().last().copied().unwrap_or(0);//获取一维向量的分量个数
     
-    for i in 0..y_size {
-        let block_start = (i / w.size()) * w.size();
-        let block_end = block_start + w.size();
+    y.data_mut().par_chunks_mut(vec_num).zip(x_data.par_chunks(vec_num))//按照分量个数划分向量获取所有的向量-zip将xy合成一个元组后面遍历的时候方便操作，zip是在原内存空间上操作的
+    .for_each(|(y_slice,x_slice)|{//y_slice和x_slice这个代表张量xy的每一个长度为n的向量 
+        let rms=(x_slice.iter().map(|&val| val*val)sum::<f32>()/vec_num as f32+epsilon).sqrt();//分母部分
 
-        let mut rms = 0.0;
-        for j in block_start..block_end {
-            rms += x.data()[j].powi(2); // 累加平方
+        for i in 0..vec_num{
+            y_slice[i]=w_data[i]*x_slice[i]/rms;//分子部分
         }
-        rms = (rms / w.size() as f32 + epsilon).sqrt(); // 计算均方根
+    });
 
-        // 归一化当前元素
-        y_data[i] = w.data()[i % w.size()] * x.data()[i] / rms;
-    }
+
+
+ 
 }
 
 // y = silu(x) * y
@@ -125,6 +123,29 @@ pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {//5
 // hint: You don't need to do an explicit transpose of B
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {//6
     todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
+    let (a_row, a_col) = (a.shape()[0], a.shape()[1]);
+    let (b_row, b_col) = (b.shape()[0], b.shape()[1]);
+    let (c_row, c_col) = (c.shape()[0], c.shape()[1]);
+
+    assert!(a_col == b_col, "Inner dimensions of A and B must match");
+    assert!(
+        a_row == c_row && b_row == c_col,
+        "Output matrix C must have shape (a_row, b_row)"
+    );
+
+    let a_data = a.data();
+    let b_data = b.data();
+    let c_data = unsafe { c.data_mut() };
+
+    for i in 0..c_row {
+        for j in 0..c_col {
+            let mut sum = 0.0;
+            for k in 0..a_col {
+                sum += a_data[i * a_col + k] * b_data[j * b_col + k];
+            }
+            c_data[i * c_col + j] = beta * c_data[i * c_col + j] + alpha * sum;
+        }
+    }
 }
 
 // Dot product of two tensors (treated as vectors)
