@@ -71,7 +71,7 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {//3
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {//传参三个张量：输入、输出、权重张量 epsilon：一个很小的值，用于避免除零错误，常见的做法是在计算 RMS 时加上一个微小的常数来稳定计算。
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试");//均方根计算逻辑：对当前行的元素平方求和、除以元素个数，再加上 epsilon 后取平方根
+    // todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试");//均方根计算逻辑：对当前行的元素平方求和、除以元素个数，再加上 epsilon 后取平方根
     assert(w.size()==x.shape().last().copied().unwrap_or(0),"w向量的分量个数和x向量的分量个数不一样");//因为w是一维的，所以size返回的才是向量的分量个数
     assert(w.shape().len()==1,"w不是一维向量");
     assert(x.shape().last().copied().unwrap_or(0)==y.shape().last().copied().unwrap_or(0),"x，y向量分量长度一样");
@@ -83,7 +83,7 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
     
     y.data_mut().par_chunks_mut(vec_num).zip(x_data.par_chunks(vec_num))//按照分量个数划分向量获取所有的向量-zip将xy合成一个元组后面遍历的时候方便操作，zip是在原内存空间上操作的
     .for_each(|(y_slice,x_slice)|{//y_slice和x_slice这个代表张量xy的每一个长度为n的向量 
-        let rms=(x_slice.iter().map(|&val| val*val)sum::<f32>()/vec_num as f32+epsilon).sqrt();//分母部分
+        let rms=(x_slice.iter().map(|&val| val*val).sum::<f32>()/vec_num as f32+epsilon).sqrt();//分母部分
 
         for i in 0..vec_num{
             y_slice[i]=w_data[i]*x_slice[i]/rms;//分子部分
@@ -104,7 +104,7 @@ pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {//5
     // let _y = unsafe { y.data_mut() };
     // let _x = x.data();
 
-    todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+    // todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考");
 
     // x.data()就是获取Tensor里的数据，如果Tensor是[1,2,3,4,5,6]，那么let a = x.data()
     // a的内容就是[1,2,3,4,5,6]
@@ -122,7 +122,7 @@ pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {//5
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {//6
-    todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
+    // todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
     let (a_row, a_col) = (a.shape()[0], a.shape()[1]);
     let (b_row, b_col) = (b.shape()[0], b.shape()[1]);
     let (c_row, c_col) = (c.shape()[0], c.shape()[1]);
