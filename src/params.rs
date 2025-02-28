@@ -1,3 +1,5 @@
+use core::slice;
+
 use crate::config::LlamaConfigJson;
 use crate::tensor::Tensor;
 use safetensors::SafeTensors;
