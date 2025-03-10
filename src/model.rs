@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::vec;
-use std::iter::Sum;
 
 use crate::config::LlamaConfigJson;
 use crate::kvcache::KVCache;
@@ -168,11 +167,20 @@ impl Llama<f32> {
         top_k: u32,
         temperature: f32,
     ) -> Vec<u32>{
+        // todo!("实现文本生成");
         let mut result = Vec::<u32>::new();
-        
-        todo!("实现文本生成");
-        
-        result
+        let mut cache = self.new_cache();
+        let mut prompt = Tensor::new(token_ids.to_vec(),&vec![token_ids.len()]);
+        while result.len() < max_len {
+            let logits = self.forward(&prompt, &mut cache);
+            let token_id = OP::random_sample(&logits, top_p, top_k, temperature);
+            if token_id==self.eos_token_id{
+                break;
+            }
+            result.push(token_id);
+            prompt = Tensor::new(vec![token_id],&vec![1]);
+        }
+        result   
     }
 }
 
