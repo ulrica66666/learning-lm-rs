@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::vec;
+use std::iter::Sum;
 
 use crate::config::LlamaConfigJson;
 use crate::kvcache::KVCache;
@@ -8,6 +9,8 @@ use crate::params::LLamaParams;
 use crate::tensor::Tensor;
 use safetensors::SafeTensors;
 use std::path::Path;
+
+
 pub struct Llama<T> {
     vocab: usize,           // vocab size
     n_layers: usize,        // number of layers
@@ -118,10 +121,10 @@ impl Llama<f32> {
 
             OP::matmul_transb(
                 &mut residual,
-                T::one(),
+                1.0,
                 &hidden_states,
                 &self.params.wo[layer],
-                T::one(),
+                1.0,
             );
 
             mlp(
@@ -186,7 +189,7 @@ fn self_attention(
     dqkv: usize,
 ) {
     // todo!("Implement self_attention");
-    let scale = T::from(dqkv as f32).unwrap().sqrt();
+    let scale = (dqkv as f32).unwrap().sqrt();
     let q_data = q.data();
     let k_data = k.data();
     let v_data = v.data();
@@ -196,7 +199,7 @@ fn self_attention(
         for group in 0..n_groups {
             for q_seq in 0..seq_len {
                 for k_seq in 0..total_seq_len {
-                    let mut dot_product = T::zero();
+                    let mut dot_product = 0.0;
                     for d in 0..dqkv {
                         let q_idx = q_seq * (n_kv_h * n_groups * dqkv)
                             + (kv_head * n_groups + group) * dqkv
@@ -219,14 +222,14 @@ fn self_attention(
     let att_data = att_scores.data();
     let hidden_data = unsafe { hidden_states.data_mut() };
     for i in 0..hidden_data.len() {
-        hidden_data[i] = T::zero();
+        hidden_data[i] = 0.0;
     }
 
     for kv_head in 0..n_kv_h {
         for group in 0..n_groups {
             for q_seq in 0..seq_len {
                 for d in 0..dqkv {
-                    let mut sum = T::zero();
+                    let mut sum = 0.0;
                     for k_seq in 0..total_seq_len {
                         let score_idx = kv_head * (n_groups * seq_len * total_seq_len)
                             + group * (seq_len * total_seq_len)
