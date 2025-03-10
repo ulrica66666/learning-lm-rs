@@ -189,7 +189,7 @@ fn self_attention(
     dqkv: usize,
 ) {
     // todo!("Implement self_attention");
-    let scale = (dqkv as f32).unwrap().sqrt();
+    let scale = (dqkv as f32).sqrt();
     let q_data = q.data();
     let k_data = k.data();
     let v_data = v.data();
