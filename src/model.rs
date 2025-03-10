@@ -101,10 +101,42 @@ impl Llama<f32> {
             let full_k = &mut cache.k_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
             let full_v = &mut cache.v_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
 
-            todo!("self_attention(...)");
-            todo!("down_proj matmul and add residual");
+            // todo!("self_attention(...)");
+            // todo!("down_proj matmul and add residual");
+            self_attention(
+                &mut hidden_states,
+                &mut att_scores,
+                q,
+                full_k,
+                full_v,
+                self.n_kv_h,
+                n_groups,
+                seq_len,
+                total_seq_len,
+                self.dqkv,
+            );
 
-            todo!("mlp(...)");
+            OP::matmul_transb(
+                &mut residual,
+                T::one(),
+                &hidden_states,
+                &self.params.wo[layer],
+                T::one(),
+            );
+
+            mlp(
+                &mut residual,
+                &mut hidden_states,
+                &mut gate_buf,
+                &mut up_buf,
+                &self.params.w_up[layer],
+                &self.params.w_down[layer],
+                &self.params.w_gate[layer],
+                &self.params.rms_ffn_w[layer],
+                self.eps,
+            );
+
+            // todo!("mlp(...)");
         }
 
         // No matter what seq_len, the output is always a 1D vector of length vocab,
@@ -153,7 +185,64 @@ fn self_attention(
     total_seq_len: usize,
     dqkv: usize,
 ) {
-    todo!("Implement self_attention");
+    // todo!("Implement self_attention");
+    let scale = T::from(dqkv as f32).unwrap().sqrt();
+    let q_data = q.data();
+    let k_data = k.data();
+    let v_data = v.data();
+    let att_data = unsafe { att_scores.data_mut() };
+
+    for kv_head in 0..n_kv_h {
+        for group in 0..n_groups {
+            for q_seq in 0..seq_len {
+                for k_seq in 0..total_seq_len {
+                    let mut dot_product = T::zero();
+                    for d in 0..dqkv {
+                        let q_idx = q_seq * (n_kv_h * n_groups * dqkv)
+                            + (kv_head * n_groups + group) * dqkv
+                            + d;
+                        let k_idx = k_seq * (n_kv_h * dqkv) + kv_head * dqkv + d;
+                        dot_product = dot_product + q_data[q_idx] * k_data[k_idx];
+                    }
+                    let score_idx = kv_head * (n_groups * seq_len * total_seq_len)
+                        + group * (seq_len * total_seq_len)
+                        + q_seq * total_seq_len
+                        + k_seq;
+                    att_data[score_idx] = dot_product / scale;
+                }
+            }
+        }
+    }
+
+    OP::masked_softmax(att_scores);
+
+    let att_data = att_scores.data();
+    let hidden_data = unsafe { hidden_states.data_mut() };
+    for i in 0..hidden_data.len() {
+        hidden_data[i] = T::zero();
+    }
+
+    for kv_head in 0..n_kv_h {
+        for group in 0..n_groups {
+            for q_seq in 0..seq_len {
+                for d in 0..dqkv {
+                    let mut sum = T::zero();
+                    for k_seq in 0..total_seq_len {
+                        let score_idx = kv_head * (n_groups * seq_len * total_seq_len)
+                            + group * (seq_len * total_seq_len)
+                            + q_seq * total_seq_len
+                            + k_seq;
+                        let v_idx = k_seq * (n_kv_h * dqkv) + kv_head * dqkv + d;
+                        sum = sum + att_data[score_idx] * v_data[v_idx];
+                    }
+                    let out_idx = q_seq * (n_kv_h * n_groups * dqkv)
+                        + (kv_head * n_groups + group) * dqkv
+                        + d;
+                    hidden_data[out_idx] = sum;
+                }
+            }
+        }
+    }
 }
 
 fn mlp(
