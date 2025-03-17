@@ -9,6 +9,11 @@ use crate::tensor::Tensor;
 use safetensors::SafeTensors;
 use std::path::Path;
 
+use tokenizers::Tokenizer;
+
+use crate::tensor::DType;  // 解决未声明类型错误
+
+
 
 pub struct Llama<T> {
     vocab: usize,           // vocab size
@@ -27,7 +32,48 @@ pub struct Llama<T> {
 }
 
 impl Llama<f32> {
+
+    pub fn chat(
+        &self, 
+        user_input: &str, 
+        tokenizer: &Tokenizer, 
+        history: &mut Vec<(String, String)>, 
+        cache: &mut KVCache<f32>
+    ) -> String {
+   
+        // 2. 组织对话上下文
+        let mut prompt = String::new();
+        for (user, assistant) in history.iter() {
+            prompt.push_str(&format!("<|im_start|>user\n{}\n<|im_end|>\n", user));
+            prompt.push_str(&format!("<|im_start|>assistant\n{}\n<|im_end|>\n", assistant));
+        }
+        prompt.push_str(&format!("<|im_start|>user\n{}\n<|im_end|>\n", user_input));
+        prompt.push_str("<|im_start|>assistant\n"); // 让模型开始回答
+    
+        // 3. 使用 Tokenizer 编码
+        let encoded = tokenizer.encode(prompt.as_str(), true).unwrap();
+        let input_ids = encoded.get_ids();
+    
+        // 4. 调用 `generate`，保持原来的生成参数
+        let output_ids = self.generate(input_ids, 500, 0.8, 30, 1.0); // 保持原参数
+    
+        // 5. 解码 token ID
+        let output_text = tokenizer.decode(&output_ids, true).unwrap();
+    
+        // 6. 处理生成结果，去掉特殊标记，并修整输出
+        let output_text = output_text.replace("<|end_story|>", "").trim().to_string();
+    
+        // 7. 记录对话历史
+        history.push((user_input.to_string(), output_text.clone()));
+    
+        // 返回生成的文本
+        output_text
+    }
+    
+    
+
     pub fn from_safetensors(model_dir: impl AsRef<Path>) -> Self {
+        // println!("Trying to open: {:?}", model_dir.as_ref().join("config.json"));
         let config = File::open(model_dir.as_ref().join("config.json")).unwrap();
         let config: LlamaConfigJson = serde_json::from_reader(config).unwrap();
         let model_file = std::fs::read(model_dir.as_ref().join("model.safetensors")).unwrap();
@@ -73,7 +119,13 @@ impl Llama<f32> {
 
         // Computation Starts Here
         // Embedding lookup
-        OP::gather(&mut residual, input, &self.params.embedding_table);
+        
+        // 将embedding_table存储为fp16
+        let table_f16 = self.params.embedding_table.to_dtype(DType::F16);
+        OP::gather(&mut residual, input, &table_f16);
+
+
+        // OP::gather(&mut residual, input, &self.params.embedding_table);
 
         for layer in 0..self.n_layers {
             OP::rms_norm(

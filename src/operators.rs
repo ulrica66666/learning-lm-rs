@@ -125,6 +125,8 @@ pub fn swiglu(y: &mut Tensor<f32>, x: &Tensor<f32>) {//5
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {//6
+    // operators.rs中的matmul_transb
+
     // todo!("实现 matmul_transb，计算前做一些必要的检查会帮助你后续调试");
     let (a_row, a_col) = (a.shape()[0], a.shape()[1]);
     let (b_row, b_col) = (b.shape()[0], b.shape()[1]);

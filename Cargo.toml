@@ -10,3 +10,7 @@ safetensors = "0.4.3"
 tokenizers = "0.19.1"
 rand = "0.8"
 rayon = "1.5.1"
+half = { version = "2.2", features = ["serde"] }  # 必须启用serde特性
+actix-web = "4.10.2"      # 使用稳定的 4.x 最新版
+actix-cors = "0.7.0"     # 配套的跨域支持库
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
